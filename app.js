@@ -1,3 +1,4 @@
+require('dotenv').config();         //we configure this so that it can access the enviournment variables.
 const express = require("express");
 const bodyParser = require("body-parser");
 const ejs = require("ejs");
@@ -17,7 +18,10 @@ const userSchema = new mongoose.Schema({    //This is no longer a Simple java sc
     password:String
 });
 
-const secretcode = "thisismysecretcode";
+// const secretcode = "thisismysecretcode";     //before using envionment variables
+const secretcode = process.env.SECRETCODE;      //after using environment variables
+
+
 userSchema.plugin(encrypt,{secret:secretcode, encryptedFields : ['password']}); 
 //This will encrypt our entire databse and then how we going to search for emails?. thats why we use encryption field.
 
