@@ -4,10 +4,12 @@ const bodyParser = require("body-parser");
 const ejs        = require("ejs");
 const mongoose   = require("mongoose");
 // const encrypt    = require("mongoose-encryption");    //we use this package for encryption and authentication.
-const md5        = require("md5");
+// const md5        = require("md5");
+const bycrypt = require("bcrypt");
+const saltrounds = 10;
 
 const app = express();
-mongoose.connect("mongodb://localhost:27017/userDB");
+mongoose.connect("mongodb://127.0.0.1/userDB");     //we changed the URL bcz of the the chhanges in ipv4 and ipv6 addressing.
 
 // const userSchema = {                      //Creating schema //This is simple javascript Object.
 //     email:String,                         //We can use this schema unless untill we are not doing anything fancy/Complex with this.
@@ -48,16 +50,18 @@ app.get("/register",function(req,res){
 })
 
 app.post("/register",function(req,res){
-
-    newUser = new User({
-        email : req.body.username,
-        // password  : req.body.password    //instead os saving the password as a string we are going to use md5 hash.
-        password : md5(req.body.password)
-    });
-    
-    newUser.save(function(err){
-        if(err) res.send(err);
-        else    res.render("secrets");
+    bycrypt.hash(req.body.password,saltrounds,function(err,hash){
+        const newUser = new User({
+            email : req.body.username,
+            password:hash
+            // password  : req.body.password    //instead os saving the password as a string we are going to use md5 hash.
+            // password : md5(req.body.password)
+        });
+        
+        newUser.save(function(err){
+            if(err) res.send(err);
+            else    res.render("secrets");
+        });
     });
 });
 
@@ -68,9 +72,12 @@ app.post("/login",function(req,res){
         if(err) connsole.log(err);
         else{
             if(founduser){
-                if(founduser.password === md5(password)){
-                    res.render("secrets");
-                }
+                bycrypt.compare(password,founduser.password,function(err,results){  //lvl4 security.
+                    if(results==true) res.render("secrets");
+                });
+                // if(founduser.password === md5(password)){
+                //     res.render("secrets");
+                // }
             }
         }
     });
