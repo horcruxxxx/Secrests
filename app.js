@@ -41,7 +41,8 @@ mongoose.connect("mongodb://127.0.0.1/userDB");     //we changed the URL bcz of 
 const userSchema = new mongoose.Schema({     //This is no longer a Simple java script obkect ,it is a object which was created using   
     email:String,                            //mongoose.schema class 
     password:String,
-    googleId:String //we added this beacuse of sign in with third party apllication Task.
+    googleId:String, //we added this beacuse of sign in with third party apllication Task.
+    secret:String   //we added this in order to store the secrets of users.
 });
 
 // const secretcode = "thisismysecretcode";     //before using envionment variables
@@ -109,15 +110,60 @@ app.get("/login",function(req,res){
     res.render("login");        
 })
 
+// app.get("/logout",function(req,res){
+//   req.logout();
+//   res.redirect("/");
+// });
+
+app.get("/logout", (req, res) => {
+  req.logout(req.user, err => {
+    if(err) return next(err);
+    res.redirect("/");
+  });
+});
+
 app.get("/register",function(req,res){
     res.render("register");        
 })
 
 app.get("/secrets",function(req,res){
-    if(req.isAuthenticated()){
-        res.render("secrets");
-    }
-    else res.redirect("/login");
+    // if(req.isAuthenticated()){
+    //     res.render("secrets");
+    // }
+    // else res.redirect("/login");
+    User.find({"secret": {$ne: null}}, function(err, foundUsers){
+      if (err){
+        console.log(err);
+      } else {
+        if (foundUsers) {
+          res.render("secrets", {usersWithSecrets: foundUsers});
+        }
+      }
+    });
+});
+
+app.get("/submit",function(req,res){
+  if(req.isAuthenticated()){
+      res.render("submit");
+  }
+  else res.redirect("/login");
+});
+
+app.post("/submit",function(req,res){
+    const submittedSecret = req.body.secret;
+    User.findById(req.user.id, function(err, foundUser){
+      if (err) {
+        console.log(err);
+      } else {
+        if (foundUser) {
+          foundUser.secret = submittedSecret;
+          foundUser.save(function(){
+            res.redirect("/secrets");
+          });
+        }
+      }
+    });
+
 });
 
 app.post("/register",function(req,res){
@@ -181,10 +227,6 @@ app.post("/login",function(req,res){
     // });
 });
 
-app.post("/logout",function(req,res){
-    req.logout();
-    res.redirect("/");
-});
 
 
 
