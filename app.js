@@ -7,6 +7,8 @@ const session    = require("express-session");
 const passport   = require("passport");
 const passportLocalMongoose = require("passport-local-mongoose");
 const { serializeUser, deserializeUser } = require('passport');
+const GoogleStrategy = require('passport-google-oauth20').Strategy;
+const findOrCreate = require("mongoose-findorcreate");
 // const encrypt    = require("mongoose-encryption");    //we use this package for encryption and authentication.
 // const md5        = require("md5");
 // const bycrypt = require("bcrypt");
@@ -38,13 +40,15 @@ mongoose.connect("mongodb://127.0.0.1/userDB");     //we changed the URL bcz of 
 
 const userSchema = new mongoose.Schema({     //This is no longer a Simple java script obkect ,it is a object which was created using   
     email:String,                            //mongoose.schema class 
-    password:String
+    password:String,
+    googleId:String //we added this beacuse of sign in with third party apllication Task.
 });
 
 // const secretcode = "thisismysecretcode";     //before using envionment variables
 const secretcode = process.env.SECRETCODE;      //after using environment variables
 
 userSchema.plugin(passportLocalMongoose);       //This will do Salting + Hashing.
+userSchema.plugin(findOrCreate);
 
 
 // userSchema.plugin(encrypt,{secret:secretcode, encryptedFields : ['password']}); 
@@ -52,14 +56,54 @@ userSchema.plugin(passportLocalMongoose);       //This will do Salting + Hashing
 
 const User = new mongoose.model("User",userSchema);     //creating Model
 
-passport.use(User.createStrategy());              //Use to authenticate users.
-passport.serializeUser(User.serializeUser());      //Creates the cookie and stuff the cookie with user information/data into.
-passport.deserializeUser(User.deserializeUser());  //Fetch the cookie and Discovers the information/data of the users.
+passport.use(User.createStrategy());               //Use to authenticate users.
+// passport.serializeUser(User.serializeUser());      //Creates the cookie and stuff the cookie with user information/data into.
+// passport.deserializeUser(User.deserializeUser());  //Fetch the cookie and Discovers the information/data of the users.
+
+//These are the serializing and non-serializing techniques which work for all type of stratergies not only for "local" stratergy 
+// as above method. 
+passport.serializeUser(function(user, cb) {
+    process.nextTick(function() {
+      return cb(null, {
+        id: user.id,
+        username: user.username,
+        picture: user.picture
+      });
+    });
+  });
+  
+  passport.deserializeUser(function(user, cb) {
+    process.nextTick(function() {
+      return cb(null, user);
+    });
+  });
+
+passport.use(new GoogleStrategy({
+    clientID: process.env.CLIENT_ID,
+    clientSecret: process.env.CLIENT_SECRET,
+    callbackURL: "http://localhost:3000/auth/google/secrets"
+  },
+  function(accessToken, refreshToken, profile, cb) {    //Access token helps us to have access user info. for a longer period of time.
+    User.findOrCreate({ googleId: profile.id }, function (err, user) {
+      return cb(err, user);
+    });
+  }
+));
 
 app.get("/",function(req,res){
     res.render("home");        //ejs ke sath render use hota hai.
 })
 
+app.get('/auth/google',        //this code snippet is added from passport.js documentaion -> stratergies -> google2.0 ->authentication 
+  passport.authenticate('google', { scope: ['profile'] })
+);
+
+app.get('/auth/google/secrets', //this code snippet is added from passport.js documentaion -> stratergies -> google2.0 ->authentication 
+  passport.authenticate('google', { failureRedirect: '/login' }),
+  function(req, res) {
+    // Successful authentication, redirect home.
+    res.redirect('/secrets');
+  });
 
 app.get("/login",function(req,res){
     res.render("login");        
